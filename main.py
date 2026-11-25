@@ -2,7 +2,9 @@
 """The Tired Dark Lord: A 100-Word Villain Monologue.
 
 Writes one original 100-word monologue, spoken by a fantasy villain who
-is secretly just very tired, to /output/entry.txt.
+is secretly just very tired, to /output/entry.txt (or $ENTRY_OUTPUT
+when set, so the entry can be exercised locally without a root-owned
+/output).
 
 Standard library only; deterministic.
 
@@ -40,6 +42,10 @@ ENTRY_MIN_CHARS = 1
 ENTRY_MAX_CHARS = 600
 EXPECTED_WORDS = 100
 
+# Output path: /output/entry.txt unless ENTRY_OUTPUT overrides it, so the
+# entry can be exercised locally without a root-owned /output.
+ENTRY_OUTPUT = os.environ.get("ENTRY_OUTPUT", "/output/entry.txt")
+
 
 def validate_monologue(text: str) -> None:
     """Check the monologue is 100 words and fits the character gate."""
@@ -59,15 +65,22 @@ def validate_monologue(text: str) -> None:
 
 def main() -> None:
     validate_monologue(MONOLOGUE)
-    os.makedirs("/output", exist_ok=True)
+    os.makedirs(os.path.dirname(ENTRY_OUTPUT) or ".", exist_ok=True)
     # Guarantee exactly one trailing newline, whatever MONOLOGUE ends with.
     # Plain open() + explicit chmod 644: the grader runs as a different
     # user, so the file must be world-readable (never tempfile.mkstemp,
     # which forces mode 0600).
     text = MONOLOGUE if MONOLOGUE.endswith("\n") else MONOLOGUE + "\n"
-    with open("/output/entry.txt", "w", encoding="utf-8", newline="\n") as f:
+    with open(ENTRY_OUTPUT, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
-    os.chmod("/output/entry.txt", 0o644)
+    os.chmod(ENTRY_OUTPUT, 0o644)
+    # Read back what landed on disk and re-validate it, so a silent
+    # write failure fails loudly instead of submitting a stale file.
+    with open(ENTRY_OUTPUT, "r", encoding="utf-8") as f:
+        written = f.read()
+    if written != text:
+        raise ValueError("entry.txt on disk differs from the monologue")
+    validate_monologue(written.rstrip("\n"))
 
 
 if __name__ == "__main__":
