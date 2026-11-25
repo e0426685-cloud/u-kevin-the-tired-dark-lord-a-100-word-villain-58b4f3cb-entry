@@ -47,24 +47,30 @@ EXPECTED_WORDS = 100
 ENTRY_OUTPUT = os.environ.get("ENTRY_OUTPUT", "/output/entry.txt")
 
 
-def validate_monologue(text: str) -> None:
-    """Check the monologue is 100 words and fits the character gate."""
+def validate(text: str) -> int:
+    """Assert *text* is a legal entry and return its word count.
+
+    A legal entry is exactly EXPECTED_WORDS words long, fits inside the
+    ENTRY_MIN_CHARS..ENTRY_MAX_CHARS character gate, and is not only
+    white space. Any breach raises AssertionError with a plain message,
+    so a broken monologue fails loudly before anything is written.
+    """
     words = text.split()
-    if len(words) != EXPECTED_WORDS:
-        raise ValueError(
-            f"monologue is {len(words)} words, expected {EXPECTED_WORDS}"
-        )
-    if not ENTRY_MIN_CHARS <= len(text) <= ENTRY_MAX_CHARS:
-        raise ValueError(
-            f"monologue is {len(text)} chars, outside the "
-            f"{ENTRY_MIN_CHARS}-{ENTRY_MAX_CHARS} gate"
-        )
-    if not text.strip():
-        raise ValueError("monologue is only white space")
+    count = len(words)
+    assert count == EXPECTED_WORDS, (
+        f"expected {EXPECTED_WORDS} words, found {count}"
+    )
+    size = len(text)
+    assert ENTRY_MIN_CHARS <= size <= ENTRY_MAX_CHARS, (
+        f"entry is {size} characters, outside the "
+        f"{ENTRY_MIN_CHARS}-{ENTRY_MAX_CHARS} gate"
+    )
+    assert text.strip(), "entry is only white space"
+    return count
 
 
 def main() -> None:
-    validate_monologue(MONOLOGUE)
+    words = validate(MONOLOGUE)
     os.makedirs(os.path.dirname(ENTRY_OUTPUT) or ".", exist_ok=True)
     # Guarantee exactly one trailing newline, whatever MONOLOGUE ends with.
     # Plain open() + explicit chmod 644: the grader runs as a different
@@ -80,7 +86,8 @@ def main() -> None:
         written = f.read()
     if written != text:
         raise ValueError("entry.txt on disk differs from the monologue")
-    validate_monologue(written.rstrip("\n"))
+    if validate(written.rstrip("\n")) != words:
+        raise ValueError("entry.txt on disk changed word count")
 
 
 if __name__ == "__main__":
